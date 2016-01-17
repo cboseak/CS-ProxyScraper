@@ -21,6 +21,7 @@ namespace ProxyScraper
         SortedList<string, int> successfulAnonProxies = new SortedList<string, int>();
         SortedList<string, int> successfulTransparentProxies = new SortedList<string, int>();
         scrapeStatus _scrapeStatus = scrapeStatus.stopped;
+        SynchronizationContext _sync = new SynchronizationContext();
 
         enum scrapeStatus
         {
@@ -32,6 +33,7 @@ namespace ProxyScraper
         {
             InitializeComponent();
             progressBar1.Visible = false;
+            _sync = SynchronizationContext.Current;
         }
 
         private void button1_Click(object sender, EventArgs e)
@@ -63,6 +65,10 @@ namespace ProxyScraper
 
         private async void testProxyList()
         {
+            progressBar1.Value = 0;
+            progressBar1.Visible = true;
+            progressBar1.Maximum = proxyList.Count();
+
             await Task.Run(() =>
             {
                 Parallel.ForEach(proxyList, proxy =>
@@ -77,22 +83,23 @@ namespace ProxyScraper
                         string ipReturned;
                         try
                         {
+                            progressBar1.BeginInvoke(new Action(() =>
+                            {
+                                progressBar1.Increment(1);
+                            }));
+
                             var download = wb.DownloadString("http://www.aol.com");
                             ipReturned = wb.DownloadString("http://web.engr.oregonstate.edu/~boseakc/ipcheck.php");
-                            Match m = Regex.Match(proxy, @".+?(?=abc)");
-                            if (m.ToString() != ipReturned)
+                            Match m = Regex.Match(proxy, @".+?(?=:)");
+                            bool legitIpAddr = Regex.IsMatch(ipReturned, @"^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$");
+                            if (legitIpAddr && m.ToString() != ipReturned)
                                 anon = true;
                             else
                                 anon = false;
                         }
                         catch
-                        {
-                            //add to fail list
-                        }
+                        { }
                         s.Stop();
-
-
-
 
                         if (s.ElapsedMilliseconds < 30000)
                         {
@@ -114,8 +121,6 @@ namespace ProxyScraper
                                     tabPage4.Text = "Non Anonymous - " + successfulTransparentProxies.Count();
                                 }));
                             }
-
-
                         }
                     }
                     textBox1.BeginInvoke(new Action(() =>
@@ -125,8 +130,7 @@ namespace ProxyScraper
                 });
 
             });
+            progressBar1.Visible = false;
         }
-
-
     }
 }
