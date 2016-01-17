@@ -21,12 +21,10 @@ namespace ProxyScraper
         {
                 for (var i = 1; i < 30; i++)
                 {
-
                     if (i < 10)
                         directory.Add("http://www.samair.ru/proxy/time-0" + i + ".htm");
                     else
                         directory.Add("http://www.samair.ru/proxy/time-" + i + ".htm");
-
                 }
 
         }

@@ -17,11 +17,17 @@ namespace ProxyScraper
 {
     public partial class Form1 : Form
     {
-        ConcurrentBag<string> proxyList = new ConcurrentBag<string>();
-        SortedList<string, int> successfulAnonProxies = new SortedList<string, int>();
-        SortedList<string, int> successfulTransparentProxies = new SortedList<string, int>();
-        scrapeStatus _scrapeStatus = scrapeStatus.stopped;
         SynchronizationContext _sync = new SynchronizationContext();
+
+        ConcurrentBag<string> proxyList = new ConcurrentBag<string>();
+        List<string> successfulAnonProxies = new List<string>();
+        List<string> successfulTransparentProxies = new List<string>();
+        List<string> badProxies = new List<string>();
+        System.Windows.Forms.Timer tmr = new System.Windows.Forms.Timer();
+        int currentPosition = 0;
+
+
+        scrapeStatus status { get; set; }
 
         enum scrapeStatus
         {
@@ -29,21 +35,69 @@ namespace ProxyScraper
             scrapingProxies = 1,
             testingProxies = 2
         }
+
+        
         public Form1()
         {
             InitializeComponent();
             progressBar1.Visible = false;
-            _sync = SynchronizationContext.Current;
+            tmr.Tick += tmr_Tick;
+            tmr.Start();
         }
 
-        private void button1_Click(object sender, EventArgs e)
+        private async void tmr_Tick(object sender, object e)
         {
-            _scrapeStatus = scrapeStatus.scrapingProxies;
-            ScraperLogic.buildScrapeList();
-            ScraperLogic.scrapeProxyPages();
-            proxyList = new ConcurrentBag<string>(ScraperLogic.scrapeProxies().Distinct().ToList());
-            textBox1.Lines = proxyList.ToArray();
-            _scrapeStatus = scrapeStatus.stopped;
+            await Task.Run(() => { 
+                if(status == scrapeStatus.stopped)
+                {
+                    label1.BeginInvoke(new Action(() => {
+                        label1.Text = "Idle";
+                        label1.ForeColor = Color.DarkRed;
+                        label2.Visible = false;
+                    }));
+                }
+                else if (status == scrapeStatus.scrapingProxies)
+                {
+                    label1.BeginInvoke(new Action(() =>
+                    {
+                        label1.Text = "Scraping Proxies";
+                        label1.ForeColor = Color.DarkGreen;
+                    }));
+                }
+                else if (status == scrapeStatus.testingProxies)
+                {
+                    label1.BeginInvoke(new Action(() =>
+                    {
+                        label1.Text = "Testing Proxies";
+                        label1.ForeColor = Color.DarkGreen;
+                        label2.Visible = true;
+                        label2.Text = currentPosition + " / " + proxyList.Count;
+                    }));
+
+                }
+            });
+        }
+
+        private async void button1_Click(object sender, EventArgs e)
+        {
+            status = scrapeStatus.scrapingProxies;
+            await Task.Run(() =>
+            {
+                label1.BeginInvoke(new Action(() =>
+                {
+                    label1.ForeColor = Color.DarkGreen;
+                    label1.Text = "Scraping Proxies";
+                }));
+                ScraperLogic.buildScrapeList();
+                ScraperLogic.scrapeProxyPages();
+                proxyList = new ConcurrentBag<string>(ScraperLogic.scrapeProxies().Distinct().ToList());
+                textBox1.BeginInvoke(new Action(() =>
+                {
+                    textBox1.Lines = proxyList.ToArray();
+                }));
+            });
+
+
         }
 
         private void button2_Click(object sender, EventArgs e)
@@ -51,17 +105,26 @@ namespace ProxyScraper
             testProxyList();
         }
 
-        private void button3_Click(object sender, EventArgs e)
+        private async void button3_Click(object sender, EventArgs e)
         {
-            _scrapeStatus = scrapeStatus.scrapingProxies;
-            ScraperLogic.buildScrapeList();
-            ScraperLogic.scrapeProxyPages();
-            proxyList = new ConcurrentBag<string>(ScraperLogic.scrapeProxies().Distinct().ToList());
-            textBox1.Lines = proxyList.ToArray();
-            _scrapeStatus = scrapeStatus.testingProxies;
+            status = scrapeStatus.scrapingProxies;
+            await Task.Run(() =>
+            {
+                ScraperLogic.buildScrapeList();
+                ScraperLogic.scrapeProxyPages();
+                proxyList = new ConcurrentBag<string>(ScraperLogic.scrapeProxies().Distinct().ToList());
+                textBox1.BeginInvoke(new Action(() =>
+                {
+                    textBox1.Lines = proxyList.ToArray();
+                }));
+            });
+
+            status = scrapeStatus.testingProxies;
             testProxyList();
-            _scrapeStatus = scrapeStatus.stopped;
         }
+
+
+
 
         private async void testProxyList()
         {
@@ -75,6 +138,7 @@ namespace ProxyScraper
                 {
                     using (WebClient wb = new WebClient())
                     {
+
                         bool anon = false;
                         WebProxy wp = new WebProxy(proxy);
                         wb.Proxy = wp;
@@ -83,6 +147,7 @@ namespace ProxyScraper
                         string ipReturned;
                         try
                         {
+
                             progressBar1.BeginInvoke(new Action(() =>
                             {
                                 progressBar1.Increment(1);
@@ -100,12 +165,12 @@ namespace ProxyScraper
                         catch
                         { }
                         s.Stop();
-
+                        currentPosition++;
                         if (s.ElapsedMilliseconds < 30000)
                         {
                             if (anon)
                             {
-                                successfulAnonProxies.Add(proxy, Convert.ToInt32(s.ElapsedMilliseconds));
+                                successfulAnonProxies.Add(proxy);
                                 textBox2.BeginInvoke(new Action(() =>
                                 {
                                     textBox2.AppendText(s.ElapsedMilliseconds.ToString() + "ms  |  " + proxy + Environment.NewLine);
@@ -114,13 +179,22 @@ namespace ProxyScraper
                             }
                             else
                             {
-                                successfulTransparentProxies.Add(proxy, Convert.ToInt32(s.ElapsedMilliseconds));
+                                successfulTransparentProxies.Add(proxy);
                                 textBox3.BeginInvoke(new Action(() =>
                                 {
                                     textBox3.AppendText(s.ElapsedMilliseconds.ToString() + "ms  |  " + proxy + Environment.NewLine);
                                     tabPage4.Text = "Non Anonymous - " + successfulTransparentProxies.Count();
                                 }));
                             }
+                        }
+                        else
+                        {
+                            badProxies.Add(proxy);
+                            textBox4.BeginInvoke(new Action(() =>
+                            {
+                                textBox4.AppendText(proxy + Environment.NewLine);
+                                tabPage5.Text = "Bad Proxies - " + successfulTransparentProxies.Count();
+                            }));
                         }
                     }
                     textBox1.BeginInvoke(new Action(() =>
