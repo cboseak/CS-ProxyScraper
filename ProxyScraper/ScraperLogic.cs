@@ -12,24 +12,26 @@ namespace ProxyScraper
 {
     class ScraperLogic
     {
-        static ConcurrentQueue<string> directory = new ConcurrentQueue<string>();
-        static ConcurrentQueue<string> proxyPages = new ConcurrentQueue<string>();
+        static ConcurrentBag<string> directory = new ConcurrentBag<string>();
+        static ConcurrentBag<string> proxyPages = new ConcurrentBag<string>();
         static ConcurrentBag<string> proxies = new ConcurrentBag<string>();
         static CancellationTokenSource cts = new CancellationTokenSource();
 
-        internal static void buildScrapeList()
+        internal async static void buildScrapeList()
         {
             for(var i = 1; i < 31; i++ )
             {
-                if (i < 10)
-                    directory.Enqueue("http://www.samair.ru/proxy/time-0" + i + ".htm");
-                else
-                    directory.Enqueue("http://www.samair.ru/proxy/time-" + i + ".htm");
+                await Task.Run(() => {
+                    if (i < 10)
+                        directory.Add("http://www.samair.ru/proxy/time-0" + i + ".htm");
+                    else
+                        directory.Add("http://www.samair.ru/proxy/time-" + i + ".htm");              
+                });
             }
         }
-        internal static ConcurrentQueue<string> scrapeProxies()
+        internal static ConcurrentBag<string> scrapeProxies()
         {
-            ConcurrentQueue<string> returnList = new ConcurrentQueue<string>();
+            ConcurrentBag<string> returnList = new ConcurrentBag<string>();
             Parallel.ForEach(proxyPages, item =>
             {
                 using (WebClient wb = new WebClient())
@@ -40,7 +42,7 @@ namespace ProxyScraper
                     foreach (var proxy in temp)
                     {
                         proxies.Add(proxy);
-                        returnList.Enqueue(proxy);
+                        returnList.Add(proxy);
                     }
                 }
             });
@@ -57,7 +59,7 @@ namespace ProxyScraper
                     string url = item;
                     string html = wb.DownloadString(url);
                     var temp = ScraperLogic.NumberExtractor2(html);
-                    Parallel.ForEach(temp, link => { proxyPages.Enqueue(link); });
+                    Parallel.ForEach(temp, link => { proxyPages.Add(link); });
                 }
             });
         }
@@ -118,6 +120,33 @@ namespace ProxyScraper
             }
             return list;
         }
+        /*
+        internal static bool isAnonProxy(string ip)
+        {
+            string ipReturned;
+            using (WebClient wb = new WebClient())
+            {
+                WebProxy wp = new WebProxy(ip);
+                wb.Proxy = wp;
+                try
+                {
+                    ipReturned = wb.DownloadString("http://web.engr.oregonstate.edu/~boseakc/ipcheck.php");
+                    Match m = Regex.Match(ip, @".+?(?=abc)");
+                    if (m.ToString() != ipReturned)
+                    {
+                        return true;
+                    }
+                    else
+                    {
+                        return false;
+                    }
+                }
+                catch { }
+
+                return false;
+
+            }
+        }*/
 
     }
 }
