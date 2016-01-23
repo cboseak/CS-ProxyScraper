@@ -138,7 +138,7 @@ namespace ProxyScraper
                 {
                     using (WebClient wb = new WebClient())
                     {
-
+                        currentPosition++;
                         bool anon = false;
                         WebProxy wp = new WebProxy(proxy);
                         wb.Proxy = wp;
@@ -165,8 +165,7 @@ namespace ProxyScraper
                         catch
                         { }
                         s.Stop();
-                        currentPosition++;
-                        if (s.ElapsedMilliseconds < 30000)
+                        if (s.ElapsedMilliseconds < 10000)
                         {
                             if (anon)
                             {
@@ -193,7 +192,6 @@ namespace ProxyScraper
                             textBox4.BeginInvoke(new Action(() =>
                             {
                                 textBox4.AppendText(proxy + Environment.NewLine);
-                                tabPage5.Text = "Bad Proxies - " + successfulTransparentProxies.Count();
                             }));
                         }
                     }
