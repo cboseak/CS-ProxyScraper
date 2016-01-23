@@ -138,13 +138,14 @@ namespace ProxyScraper
                 {
                     using (WebClient wb = new WebClient())
                     {
-                        currentPosition++;
+
                         bool anon = false;
                         WebProxy wp = new WebProxy(proxy);
                         wb.Proxy = wp;
                         Stopwatch s = new Stopwatch();
                         s.Start();
                         string ipReturned;
+                        string countryReturned = "";
                         try
                         {
 
@@ -154,7 +155,9 @@ namespace ProxyScraper
                             }));
 
                             var download = wb.DownloadString("http://www.aol.com");
-                            ipReturned = wb.DownloadString("http://web.engr.oregonstate.edu/~boseakc/ipcheck.php");
+                            ipReturned = wb.DownloadString("http://ipinfo.io/ip");
+                            countryReturned = wb.DownloadString("http://ipinfo.io/country");
+
                             Match m = Regex.Match(proxy, @".+?(?=:)");
                             bool legitIpAddr = Regex.IsMatch(ipReturned, @"^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$");
                             if (legitIpAddr && m.ToString() != ipReturned)
@@ -170,15 +173,17 @@ namespace ProxyScraper
                             if (anon)
                             {
                                 successfulAnonProxies.Add(proxy);
+                                currentPosition++;
                                 textBox2.BeginInvoke(new Action(() =>
                                 {
-                                    textBox2.AppendText(s.ElapsedMilliseconds.ToString() + "ms  |  " + proxy + Environment.NewLine);
+                                    textBox2.AppendText(countryReturned +"  |  "+ s.ElapsedMilliseconds.ToString() + "ms  |  " + proxy + Environment.NewLine);
                                     tabPage3.Text = "Anonymous - " + successfulAnonProxies.Count();
                                 }));
                             }
                             else
                             {
                                 successfulTransparentProxies.Add(proxy);
+                                currentPosition++;
                                 textBox3.BeginInvoke(new Action(() =>
                                 {
                                     textBox3.AppendText(s.ElapsedMilliseconds.ToString() + "ms  |  " + proxy + Environment.NewLine);
@@ -189,6 +194,7 @@ namespace ProxyScraper
                         else
                         {
                             badProxies.Add(proxy);
+                            currentPosition++;
                             textBox4.BeginInvoke(new Action(() =>
                             {
                                 textBox4.AppendText(proxy + Environment.NewLine);
